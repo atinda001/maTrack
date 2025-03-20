@@ -12,13 +12,13 @@ dm = DataManager()
 
 def main():
     st.title("Transport Management System")
-    
+
     # Sidebar navigation
     page = st.sidebar.selectbox(
         "Navigation",
         ["Passenger Journey", "Vehicle Expenses", "Financial Reports"]
     )
-    
+
     if page == "Passenger Journey":
         passenger_journey_page()
     elif page == "Vehicle Expenses":
@@ -28,47 +28,91 @@ def main():
 
 def passenger_journey_page():
     st.header("Record Passenger Journey")
-    
-    col1, col2 = st.columns(2)
-    
+
+    # Common journey details
+    journey_date = st.date_input("Journey Date")
+    origin = st.text_input("Origin")
+    destination = st.text_input("Destination")
+    fare = st.number_input("Fare Amount per Passenger", min_value=0.0, step=0.5)
+
+    # Create a form for 11 passengers
+    st.subheader("Passenger Details")
+    st.write("Enter details for all 11 passengers:")
+
+    # Initialize session state for passenger details if not exists
+    if 'passengers' not in st.session_state:
+        st.session_state.passengers = [{"phone": ""} for _ in range(11)]
+
+    # Create columns for the table header
+    col1, col2 = st.columns([1, 3])
     with col1:
-        phone = st.text_input("Phone Number")
-        origin = st.text_input("Origin")
-        destination = st.text_input("Destination")
-        fare = st.number_input("Fare Amount", min_value=0.0, step=0.5)
-        journey_date = st.date_input("Journey Date")
-        
-        if st.button("Record Journey"):
-            if not validate_phone(phone):
-                st.error("Please enter a valid phone number")
-            elif not origin or not destination:
-                st.error("Origin and destination are required")
-            elif fare <= 0:
-                st.error("Fare amount must be greater than 0")
-            else:
-                dm.add_passenger_journey(phone, origin, destination, fare, journey_date)
-                st.success("Journey recorded successfully")
-                st.rerun()
-    
+        st.write("Passenger #")
     with col2:
-        st.subheader("Recent Journeys")
-        journeys = dm.get_passenger_journeys()
-        if not journeys.empty:
-            st.dataframe(journeys.tail(10))
+        st.write("Phone Number")
+
+    # Create input fields for each passenger
+    for i in range(11):
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.write(f"{i + 1}")
+        with col2:
+            st.session_state.passengers[i]["phone"] = st.text_input(
+                f"Phone {i+1}",
+                key=f"phone_{i}",
+                value=st.session_state.passengers[i]["phone"]
+            )
+
+    if st.button("Record All Passengers"):
+        # Validate inputs
+        errors = []
+        if not origin or not destination:
+            errors.append("Origin and destination are required")
+        if fare <= 0:
+            errors.append("Fare amount must be greater than 0")
+
+        # Validate phone numbers
+        valid_passengers = []
+        for i, passenger in enumerate(st.session_state.passengers):
+            if passenger["phone"]:  # Only validate non-empty phone numbers
+                if not validate_phone(passenger["phone"]):
+                    errors.append(f"Invalid phone number for passenger {i+1}")
+                else:
+                    valid_passengers.append(passenger["phone"])
+
+        if len(valid_passengers) == 0:
+            errors.append("At least one passenger must be added")
+
+        if errors:
+            for error in errors:
+                st.error(error)
         else:
-            st.info("No journeys recorded yet")
+            # Add journey for each valid passenger
+            for phone in valid_passengers:
+                dm.add_passenger_journey(phone, origin, destination, fare, journey_date)
+            st.success(f"Journey recorded successfully for {len(valid_passengers)} passengers")
+            # Clear the form
+            st.session_state.passengers = [{"phone": ""} for _ in range(11)]
+            st.rerun()
+
+    # Display recent journeys
+    st.subheader("Recent Journeys")
+    journeys = dm.get_passenger_journeys()
+    if not journeys.empty:
+        st.dataframe(journeys.tail(20))
+    else:
+        st.info("No journeys recorded yet")
 
 def vehicle_expenses_page():
     st.header("Vehicle Expenses")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         expense_type = st.selectbox("Expense Type", ["Fuel", "Maintenance", "Insurance", "Other"])
         amount = st.number_input("Amount", min_value=0.0, step=1.0)
         date = st.date_input("Date")
         notes = st.text_area("Notes")
-        
+
         if st.button("Record Expense"):
             if amount <= 0:
                 st.error("Amount must be greater than 0")
@@ -76,7 +120,7 @@ def vehicle_expenses_page():
                 dm.add_expense(expense_type, amount, date, notes)
                 st.success("Expense recorded successfully")
                 st.rerun()
-    
+
     with col2:
         st.subheader("Recent Expenses")
         expenses = dm.get_expenses()
@@ -87,34 +131,34 @@ def vehicle_expenses_page():
 
 def financial_reports_page():
     st.header("Financial Reports")
-    
+
     # Date range selector
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
     with col2:
         end_date = st.date_input("End Date", datetime.now())
-    
+
     if start_date > end_date:
         st.error("Start date must be before end date")
         return
-    
+
     # Calculate metrics
     metrics = calculate_financial_metrics(dm, start_date, end_date)
-    
+
     # Display metrics
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Revenue", f"${metrics['total_revenue']:.2f}")
     col2.metric("Total Expenses", f"${metrics['total_expenses']:.2f}")
     col3.metric("Net Profit", f"${metrics['net_profit']:.2f}")
-    
+
     # Revenue chart
     st.subheader("Daily Revenue")
     daily_revenue = dm.get_daily_revenue(start_date, end_date)
     if not daily_revenue.empty:
         fig = px.line(daily_revenue, x='date', y='revenue', title='Daily Revenue')
         st.plotly_chart(fig)
-    
+
     # Expense breakdown
     st.subheader("Expense Breakdown")
     expense_breakdown = dm.get_expense_breakdown(start_date, end_date)
