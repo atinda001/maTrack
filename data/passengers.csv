@@ -1,4 +1,6 @@
 name,phone,origin,destination,fare,journey_date
 Samson,0724994012,Nairobi,Kisii,1600.0,2025-03-20
 jon,0789234657,Nairobi,Kisii,1600.0,2025-03-20
-doe,0712321278,Nairobi,Kisii,1600.0,2025-03-20
+doe,0712321278,Nairobi,Kisii,1600.0,2025-03-20max,0712329876,Nairobi,Bondo,1000.0,2025-03-20
+omollo,0791869865,Nairobi,Bondo,1000.0,2025-03-20
+doe,0791869865,Nairobi,Bondo,1000.0,2025-03-20

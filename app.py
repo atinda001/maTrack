@@ -151,39 +151,63 @@ def vehicle_expenses_page():
 def financial_reports_page():
     st.header("Financial Reports")
 
+    # Time frame selector
+    analysis_type = st.selectbox(
+        "Select Analysis Period",
+        ["Trip-based", "Weekly", "Monthly"]
+    )
+
     # Date range selector
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
+        if analysis_type == "Trip-based":
+            start_date = st.date_input("Select Trip Date")
+            end_date = start_date
+        else:
+            start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
     with col2:
-        end_date = st.date_input("End Date", datetime.now())
+        if analysis_type != "Trip-based":
+            end_date = st.date_input("End Date", datetime.now())
 
     if start_date > end_date:
         st.error("Start date must be before end date")
         return
 
-    # Calculate metrics
-    metrics = calculate_financial_metrics(dm, start_date, end_date)
+    # Calculate metrics based on selected time frame
+    metrics = calculate_financial_metrics(dm, start_date, end_date, analysis_type)
 
     # Display metrics
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Revenue", f"${metrics['total_revenue']:.2f}")
     col2.metric("Total Expenses", f"${metrics['total_expenses']:.2f}")
     col3.metric("Net Profit", f"${metrics['net_profit']:.2f}")
+    if analysis_type == "Trip-based":
+        col4.metric("Passengers", metrics['passenger_count'])
 
     # Revenue chart
-    st.subheader("Daily Revenue")
-    daily_revenue = dm.get_daily_revenue(start_date, end_date)
-    if not daily_revenue.empty:
-        fig = px.line(daily_revenue, x='date', y='revenue', title='Daily Revenue')
-        st.plotly_chart(fig)
+    if analysis_type != "Trip-based":
+        st.subheader("Revenue Trend")
+        revenue_data = dm.get_revenue_by_period(start_date, end_date, analysis_type)
+        if not revenue_data.empty:
+            fig = px.line(revenue_data, x='period', y='revenue', 
+                         title=f'{analysis_type} Revenue Analysis')
+            st.plotly_chart(fig)
 
     # Expense breakdown
     st.subheader("Expense Breakdown")
     expense_breakdown = dm.get_expense_breakdown(start_date, end_date)
     if not expense_breakdown.empty:
-        fig = px.pie(expense_breakdown, values='amount', names='expense_type', title='Expense Distribution')
+        fig = px.pie(expense_breakdown, values='amount', names='expense_type', 
+                    title='Expense Distribution')
         st.plotly_chart(fig)
+
+    # Additional analysis based on time frame
+    if analysis_type != "Trip-based":
+        st.subheader("Performance Metrics")
+        performance = dm.get_performance_metrics(start_date, end_date, analysis_type)
+        if performance:
+            metrics_df = pd.DataFrame([performance])
+            st.dataframe(metrics_df)
 
 if __name__ == "__main__":
     main()

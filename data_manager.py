@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class DataManager:
     def __init__(self):
@@ -78,15 +78,80 @@ class DataManager:
         except Exception as e:
             raise Exception(f"Error reading expenses: {str(e)}")
 
+    def get_revenue_by_period(self, start_date, end_date, period_type):
+        """Get revenue analysis by period (Weekly/Monthly)"""
+        try:
+            journeys = self.get_passenger_journeys()
+            if journeys.empty:
+                return pd.DataFrame(columns=['period', 'revenue'])
+
+            journeys['journey_date'] = pd.to_datetime(journeys['journey_date'])
+            mask = (journeys['journey_date'].dt.date >= start_date) & \
+                   (journeys['journey_date'].dt.date <= end_date)
+
+            filtered_journeys = journeys[mask]
+
+            if period_type == 'Weekly':
+                grouped = filtered_journeys.groupby(pd.Grouper(key='journey_date', freq='W-MON'))
+            else:  # Monthly
+                grouped = filtered_journeys.groupby(pd.Grouper(key='journey_date', freq='M'))
+
+            revenue_data = grouped['fare'].sum().reset_index()
+            revenue_data.columns = ['period', 'revenue']
+            return revenue_data
+
+        except Exception as e:
+            raise Exception(f"Error calculating revenue by period: {str(e)}")
+
+    def get_performance_metrics(self, start_date, end_date, period_type):
+        """Get performance metrics for the selected period"""
+        try:
+            journeys = self.get_passenger_journeys()
+            expenses = self.get_expenses()
+
+            if journeys.empty:
+                return None
+
+            # Convert dates
+            journeys['journey_date'] = pd.to_datetime(journeys['journey_date'])
+            expenses['date'] = pd.to_datetime(expenses['date'])
+
+            # Filter by date range
+            journey_mask = (journeys['journey_date'].dt.date >= start_date) & \
+                          (journeys['journey_date'].dt.date <= end_date)
+            expense_mask = (expenses['date'].dt.date >= start_date) & \
+                          (expenses['date'].dt.date <= end_date)
+
+            filtered_journeys = journeys[journey_mask]
+            filtered_expenses = expenses[expense_mask]
+
+            # Calculate metrics
+            total_trips = len(filtered_journeys['journey_date'].unique())
+            total_passengers = len(filtered_journeys)
+            avg_passengers_per_trip = total_passengers / total_trips if total_trips > 0 else 0
+            avg_revenue_per_trip = filtered_journeys['fare'].sum() / total_trips if total_trips > 0 else 0
+            total_expenses = filtered_expenses['amount'].sum()
+
+            return {
+                'Total Trips': total_trips,
+                'Total Passengers': total_passengers,
+                'Average Passengers per Trip': round(avg_passengers_per_trip, 2),
+                'Average Revenue per Trip': round(avg_revenue_per_trip, 2),
+                'Total Expenses': total_expenses
+            }
+
+        except Exception as e:
+            raise Exception(f"Error calculating performance metrics: {str(e)}")
+
     def get_daily_revenue(self, start_date, end_date):
         """Get daily revenue between dates"""
         try:
             journeys = self.get_passenger_journeys()
             if not journeys.empty:
                 journeys['journey_date'] = pd.to_datetime(journeys['journey_date'])
-                mask = (journeys['journey_date'] >= pd.Timestamp(start_date)) & \
-                       (journeys['journey_date'] <= pd.Timestamp(end_date))
-                daily = journeys[mask].groupby('journey_date')['fare'].sum().reset_index()
+                mask = (journeys['journey_date'].dt.date >= start_date) & \
+                       (journeys['journey_date'].dt.date <= end_date)
+                daily = journeys[mask].groupby(journeys['journey_date'].dt.date)['fare'].sum().reset_index()
                 daily.columns = ['date', 'revenue']
                 return daily
             return pd.DataFrame(columns=['date', 'revenue'])
@@ -99,8 +164,8 @@ class DataManager:
             expenses = self.get_expenses()
             if not expenses.empty:
                 expenses['date'] = pd.to_datetime(expenses['date'])
-                mask = (expenses['date'] >= pd.Timestamp(start_date)) & \
-                       (expenses['date'] <= pd.Timestamp(end_date))
+                mask = (expenses['date'].dt.date >= start_date) & \
+                       (expenses['date'].dt.date <= end_date)
                 return expenses[mask].groupby('expense_type')['amount'].sum().reset_index()
             return pd.DataFrame(columns=['expense_type', 'amount'])
         except Exception as e:
