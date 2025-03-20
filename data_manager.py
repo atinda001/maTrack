@@ -13,7 +13,11 @@ class DataManager:
             # Check if passenger exists
             passenger = self.db.query(Passenger).filter_by(phone=phone).first()
             if not passenger:
-                passenger = Passenger(name=name, phone=phone)
+                passenger = Passenger(
+                    name=name,
+                    phone=phone,
+                    owner_id=st.session_state.user_id
+                )
                 self.db.add(passenger)
                 self.db.flush()
 
@@ -32,7 +36,7 @@ class DataManager:
             raise Exception(f"Error adding passenger journey: {str(e)}")
 
     def get_passenger_journeys(self):
-        """Get all passenger journeys"""
+        """Get all passenger journeys for the current user"""
         try:
             journeys = self.db.query(
                 Journey.journey_date,
@@ -41,7 +45,9 @@ class DataManager:
                 Journey.origin,
                 Journey.destination,
                 Journey.fare
-            ).join(Passenger).all()
+            ).join(Passenger).filter(
+                Passenger.owner_id == st.session_state.user_id
+            ).all()
 
             return pd.DataFrame([{
                 'journey_date': j.journey_date,
@@ -61,7 +67,8 @@ class DataManager:
                 expense_type=expense_type,
                 amount=amount,
                 date=date,
-                notes=notes
+                notes=notes,
+                owner_id=st.session_state.user_id
             )
             self.db.add(expense)
             self.db.commit()
@@ -70,9 +77,11 @@ class DataManager:
             raise Exception(f"Error adding expense: {str(e)}")
 
     def get_expenses(self):
-        """Get all expenses"""
+        """Get all expenses for the current user"""
         try:
-            expenses = self.db.query(Expense).all()
+            expenses = self.db.query(Expense).filter(
+                Expense.owner_id == st.session_state.user_id
+            ).all()
             return pd.DataFrame([{
                 'expense_type': e.expense_type,
                 'amount': e.amount,
@@ -91,8 +100,9 @@ class DataManager:
                     Journey.journey_date
                 ).label('period'),
                 func.sum(Journey.fare).label('revenue')
-            ).filter(
-                Journey.journey_date.between(start_date, end_date)
+            ).join(Passenger).filter(
+                Journey.journey_date.between(start_date, end_date),
+                Passenger.owner_id == st.session_state.user_id
             ).group_by('period').order_by('period')
 
             results = query.all()
@@ -108,13 +118,15 @@ class DataManager:
         """Get performance metrics for the selected period"""
         try:
             # Get journey metrics
-            journeys = self.db.query(Journey).filter(
-                Journey.journey_date.between(start_date, end_date)
+            journeys = self.db.query(Journey).join(Passenger).filter(
+                Journey.journey_date.between(start_date, end_date),
+                Passenger.owner_id == st.session_state.user_id
             ).all()
 
             # Get expense metrics
             expenses = self.db.query(Expense).filter(
-                Expense.date.between(start_date, end_date)
+                Expense.date.between(start_date, end_date),
+                Expense.owner_id == st.session_state.user_id
             ).all()
 
             if not journeys:
@@ -143,7 +155,8 @@ class DataManager:
                 Expense.expense_type,
                 func.sum(Expense.amount).label('amount')
             ).filter(
-                Expense.date.between(start_date, end_date)
+                Expense.date.between(start_date, end_date),
+                Expense.owner_id == st.session_state.user_id
             ).group_by(Expense.expense_type).all()
 
             return pd.DataFrame([{

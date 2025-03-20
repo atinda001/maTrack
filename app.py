@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from data_manager import DataManager
 from utils import validate_phone, calculate_financial_metrics
+from auth_manager import AuthManager
 
 # Page configuration
 st.set_page_config(
@@ -45,13 +46,69 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize DataManager
+# Initialize managers
+auth_manager = AuthManager()
 dm = DataManager()
 
-def main():
+def login_page():
     st.title("🚌 Transport Management System")
 
-    # Sidebar navigation with icons
+    tab1, tab2 = st.tabs(["Login", "Register"])
+
+    with tab1:
+        with st.form("login_form"):
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Login")
+
+            if submit:
+                success, message = auth_manager.login_user(email, password)
+                if success:
+                    st.session_state.authenticated = True
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+
+        st.divider()
+        if st.button("Login with Google"):
+            # Google OAuth implementation will go here
+            pass
+
+    with tab2:
+        with st.form("register_form"):
+            name = st.text_input("Name")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            submit = st.form_submit_button("Register")
+
+            if submit:
+                if password != confirm_password:
+                    st.error("Passwords do not match")
+                else:
+                    success, message = auth_manager.register_user(email, password, name)
+                    if success:
+                        st.success(message)
+                    else:
+                        st.error(message)
+
+def main():
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    if not st.session_state.authenticated:
+        login_page()
+        return
+
+    st.title("🚌 Transport Management System")
+
+    # Logout button in sidebar
+    if st.sidebar.button("Logout"):
+        auth_manager.logout_user()
+        st.session_state.authenticated = False
+        st.rerun()
+
+    # Navigation
     page = st.sidebar.selectbox(
         "Navigation",
         ["🎫 Passenger Journey", "💰 Vehicle Expenses", "📊 Financial Reports"]
@@ -67,6 +124,7 @@ def main():
 def passenger_journey_page():
     st.header("🎫 Record Passenger Journey")
 
+    # Trip Details Section
     with st.container():
         st.markdown("""
             <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
@@ -84,7 +142,7 @@ def passenger_journey_page():
 
         fare = st.number_input("Fare Amount per Passenger", min_value=0.0, step=0.5)
 
-    # Passenger Details Section
+    # Passenger Details Table
     st.markdown("""
         <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
             <h4>Passenger Details</h4>
@@ -96,16 +154,16 @@ def passenger_journey_page():
     if 'passengers' not in st.session_state:
         st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
 
-    # Create columns for the table header
+    # Create table-like layout
     col1, col2, col3 = st.columns([1, 2, 2])
     with col1:
-        st.write("Passenger #")
+        st.write("#")
     with col2:
         st.write("Name")
     with col3:
         st.write("Phone Number")
 
-    # Create input fields for each passenger
+    # Create rows for each passenger
     for i in range(11):
         col1, col2, col3 = st.columns([1, 2, 2])
         with col1:
@@ -166,7 +224,7 @@ def passenger_journey_page():
             st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
             st.rerun()
 
-    # Display recent journeys in a styled container
+    # Recent Journeys Section
     st.markdown("""
         <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
             <h4>Recent Journeys</h4>
@@ -178,7 +236,7 @@ def passenger_journey_page():
         st.dataframe(
             journeys.tail(20),
             use_container_width=True,
-            hide_index=True,
+            hide_index=True
         )
     else:
         st.info("No journeys recorded yet")
