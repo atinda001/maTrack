@@ -41,21 +41,29 @@ def passenger_journey_page():
 
     # Initialize session state for passenger details if not exists
     if 'passengers' not in st.session_state:
-        st.session_state.passengers = [{"phone": ""} for _ in range(11)]
+        st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
 
     # Create columns for the table header
-    col1, col2 = st.columns([1, 3])
+    col1, col2, col3 = st.columns([1, 2, 2])
     with col1:
         st.write("Passenger #")
     with col2:
+        st.write("Name")
+    with col3:
         st.write("Phone Number")
 
     # Create input fields for each passenger
     for i in range(11):
-        col1, col2 = st.columns([1, 3])
+        col1, col2, col3 = st.columns([1, 2, 2])
         with col1:
             st.write(f"{i + 1}")
         with col2:
+            st.session_state.passengers[i]["name"] = st.text_input(
+                f"Name {i+1}",
+                key=f"name_{i}",
+                value=st.session_state.passengers[i]["name"]
+            )
+        with col3:
             st.session_state.passengers[i]["phone"] = st.text_input(
                 f"Phone {i+1}",
                 key=f"phone_{i}",
@@ -70,14 +78,18 @@ def passenger_journey_page():
         if fare <= 0:
             errors.append("Fare amount must be greater than 0")
 
-        # Validate phone numbers
+        # Validate passenger details
         valid_passengers = []
         for i, passenger in enumerate(st.session_state.passengers):
-            if passenger["phone"]:  # Only validate non-empty phone numbers
-                if not validate_phone(passenger["phone"]):
+            if passenger["name"] or passenger["phone"]:  # If either field is filled
+                if not passenger["name"]:
+                    errors.append(f"Name is required for passenger {i+1}")
+                elif not passenger["phone"]:
+                    errors.append(f"Phone number is required for passenger {i+1}")
+                elif not validate_phone(passenger["phone"]):
                     errors.append(f"Invalid phone number for passenger {i+1}")
                 else:
-                    valid_passengers.append(passenger["phone"])
+                    valid_passengers.append(passenger)
 
         if len(valid_passengers) == 0:
             errors.append("At least one passenger must be added")
@@ -87,11 +99,18 @@ def passenger_journey_page():
                 st.error(error)
         else:
             # Add journey for each valid passenger
-            for phone in valid_passengers:
-                dm.add_passenger_journey(phone, origin, destination, fare, journey_date)
+            for passenger in valid_passengers:
+                dm.add_passenger_journey(
+                    passenger["name"],
+                    passenger["phone"],
+                    origin,
+                    destination,
+                    fare,
+                    journey_date
+                )
             st.success(f"Journey recorded successfully for {len(valid_passengers)} passengers")
             # Clear the form
-            st.session_state.passengers = [{"phone": ""} for _ in range(11)]
+            st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
             st.rerun()
 
     # Display recent journeys
