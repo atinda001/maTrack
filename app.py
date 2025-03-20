@@ -132,99 +132,116 @@ def passenger_journey_page():
             </div>
         """, unsafe_allow_html=True)
 
+        # Initialize session state for trip details
+        if 'current_journey' not in st.session_state:
+            st.session_state.current_journey = {
+                'date': None,
+                'origin': '',
+                'destination': '',
+                'fare': 0.0,
+                'passengers': []
+            }
+
         col1, col2, col3 = st.columns(3)
         with col1:
             journey_date = st.date_input("Journey Date")
+            st.session_state.current_journey['date'] = journey_date
         with col2:
             origin = st.text_input("Origin")
+            st.session_state.current_journey['origin'] = origin
         with col3:
             destination = st.text_input("Destination")
+            st.session_state.current_journey['destination'] = destination
 
         fare = st.number_input("Fare Amount per Passenger", min_value=0.0, step=0.5)
+        st.session_state.current_journey['fare'] = fare
 
-    # Passenger Details Table
+    # Passenger Details Section
     st.markdown("""
         <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
-            <h4>Passenger Details</h4>
-            <p>Enter details for all 11 passengers:</p>
+            <h4>Add Passenger</h4>
+            <p>Add passengers one by one (Maximum: 11 passengers)</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # Initialize session state for passenger details
-    if 'passengers' not in st.session_state:
-        st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
+    # Display current passenger count
+    passenger_count = len(st.session_state.current_journey['passengers'])
+    st.info(f"Passengers added: {passenger_count}/11")
 
-    # Create table-like layout
-    col1, col2, col3 = st.columns([1, 2, 2])
-    with col1:
-        st.write("#")
-    with col2:
-        st.write("Name")
-    with col3:
-        st.write("Phone Number")
-
-    # Create rows for each passenger
-    for i in range(11):
-        col1, col2, col3 = st.columns([1, 2, 2])
+    # Add single passenger form
+    if passenger_count < 11:
+        col1, col2 = st.columns(2)
         with col1:
-            st.write(f"{i + 1}")
+            name = st.text_input("Passenger Name", key="new_passenger_name")
         with col2:
-            st.session_state.passengers[i]["name"] = st.text_input(
-                f"Name {i+1}",
-                key=f"name_{i}",
-                value=st.session_state.passengers[i]["name"]
-            )
-        with col3:
-            st.session_state.passengers[i]["phone"] = st.text_input(
-                f"Phone {i+1}",
-                key=f"phone_{i}",
-                value=st.session_state.passengers[i]["phone"]
-            )
+            phone = st.text_input("Phone Number", key="new_passenger_phone")
 
-    if st.button("Record All Passengers", type="primary"):
-        # Validate inputs
-        errors = []
-        if not origin or not destination:
-            errors.append("Origin and destination are required")
-        if fare <= 0:
-            errors.append("Fare amount must be greater than 0")
+        if st.button("Add Passenger", type="primary", disabled=passenger_count >= 11):
+            # Validate inputs
+            errors = []
+            if not name:
+                errors.append("Name is required")
+            if not phone:
+                errors.append("Phone number is required")
+            elif not validate_phone(phone):
+                errors.append("Invalid phone number format")
 
-        # Validate passenger details
-        valid_passengers = []
-        for i, passenger in enumerate(st.session_state.passengers):
-            if passenger["name"] or passenger["phone"]:  # If either field is filled
-                if not passenger["name"]:
-                    errors.append(f"Name is required for passenger {i+1}")
-                elif not passenger["phone"]:
-                    errors.append(f"Phone number is required for passenger {i+1}")
-                elif not validate_phone(passenger["phone"]):
-                    errors.append(f"Invalid phone number for passenger {i+1}")
-                else:
-                    valid_passengers.append(passenger)
+            if not errors:
+                try:
+                    # Add passenger to the journey
+                    dm.add_passenger_journey(
+                        name=name,
+                        phone=phone,
+                        origin=origin,
+                        destination=destination,
+                        fare=fare,
+                        journey_date=journey_date
+                    )
 
-        if len(valid_passengers) == 0:
-            errors.append("At least one passenger must be added")
+                    # Add to current journey list
+                    st.session_state.current_journey['passengers'].append({
+                        'name': name,
+                        'phone': phone
+                    })
 
-        if errors:
-            for error in errors:
-                st.error(error)
-        else:
-            # Add journey for each valid passenger
-            for passenger in valid_passengers:
-                dm.add_passenger_journey(
-                    passenger["name"],
-                    passenger["phone"],
-                    origin,
-                    destination,
-                    fare,
-                    journey_date
-                )
-            st.success(f"Journey recorded successfully for {len(valid_passengers)} passengers")
-            # Clear the form
-            st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
+                    st.success(f"Passenger {name} added successfully!")
+
+                    # Clear the input fields
+                    st.session_state.new_passenger_name = ""
+                    st.session_state.new_passenger_phone = ""
+
+                    if len(st.session_state.current_journey['passengers']) >= 11:
+                        st.success("Maximum number of passengers reached!")
+
+                    st.rerun()
+                except Exception as e:
+                    st.error("Error adding passenger. Please try again.")
+            else:
+                for error in errors:
+                    st.error(error)
+
+    # Display current journey passengers
+    if st.session_state.current_journey['passengers']:
+        st.markdown("""
+            <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+                <h4>Current Journey Passengers</h4>
+            </div>
+        """, unsafe_allow_html=True)
+
+        passengers_df = pd.DataFrame(st.session_state.current_journey['passengers'])
+        st.dataframe(passengers_df, use_container_width=True, hide_index=True)
+
+        if st.button("Clear Current Journey", type="secondary"):
+            st.session_state.current_journey = {
+                'date': None,
+                'origin': '',
+                'destination': '',
+                'fare': 0.0,
+                'passengers': []
+            }
             st.rerun()
 
-    # Recent Journeys Section
+    # Display all recent journeys
     st.markdown("""
         <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
             <h4>Recent Journeys</h4>

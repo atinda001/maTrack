@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from database import SessionLocal, Passenger, Journey, Expense
 from sqlalchemy import func, extract
+import streamlit as st
 
 class DataManager:
     def __init__(self):
@@ -10,8 +11,15 @@ class DataManager:
     def add_passenger_journey(self, name, phone, origin, destination, fare, journey_date):
         """Add a new passenger journey"""
         try:
+            if 'user_id' not in st.session_state:
+                raise Exception("User not authenticated")
+
             # Check if passenger exists
-            passenger = self.db.query(Passenger).filter_by(phone=phone).first()
+            passenger = self.db.query(Passenger).filter_by(
+                phone=phone,
+                owner_id=st.session_state.user_id
+            ).first()
+
             if not passenger:
                 passenger = Passenger(
                     name=name,
