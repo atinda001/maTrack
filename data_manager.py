@@ -86,21 +86,19 @@ class DataManager:
         """Get revenue analysis by period (Weekly/Monthly)"""
         try:
             query = self.db.query(
-                Journey.journey_date,
+                func.date_trunc(
+                    'week' if period_type == 'Weekly' else 'month',
+                    Journey.journey_date
+                ).label('period'),
                 func.sum(Journey.fare).label('revenue')
             ).filter(
                 Journey.journey_date.between(start_date, end_date)
-            )
-
-            if period_type == 'Weekly':
-                query = query.group_by(func.date_trunc('week', Journey.journey_date))
-            else:  # Monthly
-                query = query.group_by(func.date_trunc('month', Journey.journey_date))
+            ).group_by('period').order_by('period')
 
             results = query.all()
 
             return pd.DataFrame([{
-                'period': r.journey_date,
+                'period': r.period,
                 'revenue': r.revenue
             } for r in results])
         except Exception as e:

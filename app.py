@@ -5,41 +5,94 @@ from datetime import datetime, timedelta
 from data_manager import DataManager
 from utils import validate_phone, calculate_financial_metrics
 
-st.set_page_config(page_title="Transport Management System", layout="wide")
+# Page configuration
+st.set_page_config(
+    page_title="Transport Management System",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    .stTabs {
+        background-color: #F5F7FA;
+        padding: 1rem;
+        border-radius: 10px;
+    }
+    .stMetric {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    div[data-testid="stDataFrame"] {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stPlotlyChart {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Initialize DataManager
 dm = DataManager()
 
 def main():
-    st.title("Transport Management System")
+    st.title("🚌 Transport Management System")
 
-    # Sidebar navigation
+    # Sidebar navigation with icons
     page = st.sidebar.selectbox(
         "Navigation",
-        ["Passenger Journey", "Vehicle Expenses", "Financial Reports"]
+        ["🎫 Passenger Journey", "💰 Vehicle Expenses", "📊 Financial Reports"]
     )
 
-    if page == "Passenger Journey":
+    if "🎫 Passenger Journey" in page:
         passenger_journey_page()
-    elif page == "Vehicle Expenses":
+    elif "💰 Vehicle Expenses" in page:
         vehicle_expenses_page()
     else:
         financial_reports_page()
 
 def passenger_journey_page():
-    st.header("Record Passenger Journey")
+    st.header("🎫 Record Passenger Journey")
 
-    # Common journey details
-    journey_date = st.date_input("Journey Date")
-    origin = st.text_input("Origin")
-    destination = st.text_input("Destination")
-    fare = st.number_input("Fare Amount per Passenger", min_value=0.0, step=0.5)
+    with st.container():
+        st.markdown("""
+            <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
+                <h4>Trip Details</h4>
+            </div>
+        """, unsafe_allow_html=True)
 
-    # Create a form for 11 passengers
-    st.subheader("Passenger Details")
-    st.write("Enter details for all 11 passengers:")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            journey_date = st.date_input("Journey Date")
+        with col2:
+            origin = st.text_input("Origin")
+        with col3:
+            destination = st.text_input("Destination")
 
-    # Initialize session state for passenger details if not exists
+        fare = st.number_input("Fare Amount per Passenger", min_value=0.0, step=0.5)
+
+    # Passenger Details Section
+    st.markdown("""
+        <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+            <h4>Passenger Details</h4>
+            <p>Enter details for all 11 passengers:</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Initialize session state for passenger details
     if 'passengers' not in st.session_state:
         st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
 
@@ -70,7 +123,7 @@ def passenger_journey_page():
                 value=st.session_state.passengers[i]["phone"]
             )
 
-    if st.button("Record All Passengers"):
+    if st.button("Record All Passengers", type="primary"):
         # Validate inputs
         errors = []
         if not origin or not destination:
@@ -113,101 +166,175 @@ def passenger_journey_page():
             st.session_state.passengers = [{"name": "", "phone": ""} for _ in range(11)]
             st.rerun()
 
-    # Display recent journeys
-    st.subheader("Recent Journeys")
+    # Display recent journeys in a styled container
+    st.markdown("""
+        <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+            <h4>Recent Journeys</h4>
+        </div>
+    """, unsafe_allow_html=True)
+
     journeys = dm.get_passenger_journeys()
     if not journeys.empty:
-        st.dataframe(journeys.tail(20))
+        st.dataframe(
+            journeys.tail(20),
+            use_container_width=True,
+            hide_index=True,
+        )
     else:
         st.info("No journeys recorded yet")
 
 def vehicle_expenses_page():
-    st.header("Vehicle Expenses")
+    st.header("💰 Vehicle Expenses")
 
-    col1, col2 = st.columns(2)
+    with st.container():
+        col1, col2 = st.columns([1, 1])
 
-    with col1:
-        expense_type = st.selectbox("Expense Type", ["Fuel", "Maintenance", "Insurance", "Other"])
-        amount = st.number_input("Amount", min_value=0.0, step=1.0)
-        date = st.date_input("Date")
-        notes = st.text_area("Notes")
+        with col1:
+            st.markdown("""
+                <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
+                    <h4>Record New Expense</h4>
+                </div>
+            """, unsafe_allow_html=True)
 
-        if st.button("Record Expense"):
-            if amount <= 0:
-                st.error("Amount must be greater than 0")
+            expense_type = st.selectbox("Expense Type", ["Fuel", "Maintenance", "Insurance", "Other"])
+            amount = st.number_input("Amount", min_value=0.0, step=1.0)
+            date = st.date_input("Date")
+            notes = st.text_area("Notes")
+
+            if st.button("Record Expense", type="primary"):
+                if amount <= 0:
+                    st.error("Amount must be greater than 0")
+                else:
+                    dm.add_expense(expense_type, amount, date, notes)
+                    st.success("Expense recorded successfully")
+                    st.rerun()
+
+        with col2:
+            st.markdown("""
+                <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
+                    <h4>Recent Expenses</h4>
+                </div>
+            """, unsafe_allow_html=True)
+
+            expenses = dm.get_expenses()
+            if not expenses.empty:
+                st.dataframe(
+                    expenses.tail(10),
+                    use_container_width=True,
+                    hide_index=True
+                )
             else:
-                dm.add_expense(expense_type, amount, date, notes)
-                st.success("Expense recorded successfully")
-                st.rerun()
-
-    with col2:
-        st.subheader("Recent Expenses")
-        expenses = dm.get_expenses()
-        if not expenses.empty:
-            st.dataframe(expenses.tail(10))
-        else:
-            st.info("No expenses recorded yet")
+                st.info("No expenses recorded yet")
 
 def financial_reports_page():
-    st.header("Financial Reports")
+    st.header("📊 Financial Reports")
 
-    # Time frame selector
-    analysis_type = st.selectbox(
-        "Select Analysis Period",
-        ["Trip-based", "Weekly", "Monthly"]
-    )
+    with st.container():
+        # Time frame selector
+        st.markdown("""
+            <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
+                <h4>Select Analysis Period</h4>
+            </div>
+        """, unsafe_allow_html=True)
 
-    # Date range selector
-    col1, col2 = st.columns(2)
-    with col1:
+        analysis_type = st.selectbox(
+            "Analysis Type",
+            ["Trip-based", "Weekly", "Monthly"]
+        )
+
+        # Date range selector
+        col1, col2 = st.columns(2)
+        with col1:
+            if analysis_type == "Trip-based":
+                start_date = st.date_input("Select Trip Date")
+                end_date = start_date
+            else:
+                start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
+        with col2:
+            if analysis_type != "Trip-based":
+                end_date = st.date_input("End Date", datetime.now())
+
+        if start_date > end_date:
+            st.error("Start date must be before end date")
+            return
+
+        # Calculate metrics
+        metrics = calculate_financial_metrics(dm, start_date, end_date, analysis_type)
+
+        # Display metrics in a styled container
+        st.markdown("""
+            <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+                <h4>Financial Overview</h4>
+            </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Revenue", f"${metrics['total_revenue']:.2f}")
+        col2.metric("Total Expenses", f"${metrics['total_expenses']:.2f}")
+        col3.metric("Net Profit", f"${metrics['net_profit']:.2f}")
         if analysis_type == "Trip-based":
-            start_date = st.date_input("Select Trip Date")
-            end_date = start_date
-        else:
-            start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
-    with col2:
+            col4.metric("Passengers", metrics['passenger_count'])
+
+        # Revenue chart
         if analysis_type != "Trip-based":
-            end_date = st.date_input("End Date", datetime.now())
+            st.markdown("""
+                <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+                    <h4>Revenue Trend</h4>
+                </div>
+            """, unsafe_allow_html=True)
 
-    if start_date > end_date:
-        st.error("Start date must be before end date")
-        return
+            revenue_data = dm.get_revenue_by_period(start_date, end_date, analysis_type)
+            if not revenue_data.empty:
+                fig = px.line(
+                    revenue_data,
+                    x='period',
+                    y='revenue',
+                    title=f'{analysis_type} Revenue Analysis'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    margin=dict(t=40, l=0, r=0, b=0)
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
-    # Calculate metrics based on selected time frame
-    metrics = calculate_financial_metrics(dm, start_date, end_date, analysis_type)
+        # Expense breakdown
+        st.markdown("""
+            <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+                <h4>Expense Breakdown</h4>
+            </div>
+        """, unsafe_allow_html=True)
 
-    # Display metrics
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Revenue", f"${metrics['total_revenue']:.2f}")
-    col2.metric("Total Expenses", f"${metrics['total_expenses']:.2f}")
-    col3.metric("Net Profit", f"${metrics['net_profit']:.2f}")
-    if analysis_type == "Trip-based":
-        col4.metric("Passengers", metrics['passenger_count'])
+        expense_breakdown = dm.get_expense_breakdown(start_date, end_date)
+        if not expense_breakdown.empty:
+            fig = px.pie(
+                expense_breakdown,
+                values='amount',
+                names='expense_type',
+                title='Expense Distribution'
+            )
+            fig.update_layout(
+                showlegend=True,
+                margin=dict(t=40, l=0, r=0, b=0)
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-    # Revenue chart
-    if analysis_type != "Trip-based":
-        st.subheader("Revenue Trend")
-        revenue_data = dm.get_revenue_by_period(start_date, end_date, analysis_type)
-        if not revenue_data.empty:
-            fig = px.line(revenue_data, x='period', y='revenue', 
-                         title=f'{analysis_type} Revenue Analysis')
-            st.plotly_chart(fig)
+        # Additional analysis
+        if analysis_type != "Trip-based":
+            st.markdown("""
+                <div style='background-color: #F5F7FA; padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
+                    <h4>Performance Metrics</h4>
+                </div>
+            """, unsafe_allow_html=True)
 
-    # Expense breakdown
-    st.subheader("Expense Breakdown")
-    expense_breakdown = dm.get_expense_breakdown(start_date, end_date)
-    if not expense_breakdown.empty:
-        fig = px.pie(expense_breakdown, values='amount', names='expense_type', 
-                    title='Expense Distribution')
-        st.plotly_chart(fig)
-
-    # Additional analysis based on time frame
-    if analysis_type != "Trip-based":
-        st.subheader("Performance Metrics")
-        performance = dm.get_performance_metrics(start_date, end_date, analysis_type)
-        if performance:
-            metrics_df = pd.DataFrame([performance])
-            st.dataframe(metrics_df)
+            performance = dm.get_performance_metrics(start_date, end_date, analysis_type)
+            if performance:
+                metrics_df = pd.DataFrame([performance])
+                st.dataframe(
+                    metrics_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
 if __name__ == "__main__":
     main()
